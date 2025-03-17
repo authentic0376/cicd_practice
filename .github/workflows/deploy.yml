@@ -1,0 +1,72 @@
+name: Deploy to Remote Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      REMOTE_USER: ${{ secrets.REMOTE_USER }}
+      REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+      REMOTE_PATH: "C:/docker_volumes/cicd_practice_volume"
+      CONTAINER: "my-app-container"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Create SSH Private Key (Once)
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key
+
+      - name: Build BootJar
+        run: |
+          ./gradlew clean build
+
+      - name: Upload BootJar and Dockerfile to Remote Server
+        run: |
+          scp -i private_key -o StrictHostKeyChecking=no build/libs/*-boot.jar "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/app.jar"
+          scp -i private_key -o StrictHostKeyChecking=no Dockerfile "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/Dockerfile"
+
+      - name: Deploy via SSH
+        run: |
+          ssh -t -i private_key -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST <<ENDSSH
+          set -x
+          export REMOTE_PATH="$REMOTE_PATH"
+          export CONTAINER="$CONTAINER"
+
+          cd "\$REMOTE_PATH"
+
+          # Docker 빌드
+          docker build -t my-app .
+
+          # 기존 컨테이너 정리
+          echo "Checking if \$CONTAINER exists..."
+          output=\$(docker ps -aq --filter "name=\$CONTAINER")
+          echo "Output of docker ps -aq: '\$output'"
+
+          if [ -n "\$output" ]; then
+              echo "Container found. Stopping and removing..."
+              docker stop "\$CONTAINER"
+              docker rm "\$CONTAINER"
+          else
+              echo "Container not found. Skipping removal."
+          fi
+
+          # 새 컨테이너 실행
+          docker run -d --name "\$CONTAINER" -v "\$REMOTE_PATH:/app" -p 8080:8080 my-app
+
+          set +x
+          ENDSSH
