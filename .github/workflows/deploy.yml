@@ -31,6 +31,9 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
 
+      - name: Grant execute permission to Gradle
+        run: chmod +x ./gradlew
+
       - name: Build BootJar
         run: |
           ./gradlew clean build
