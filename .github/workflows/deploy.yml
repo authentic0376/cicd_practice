@@ -40,7 +40,7 @@ jobs:
 
       - name: Upload BootJar and Dockerfile to Remote Server
         run: |
-          scp -i private_key -o StrictHostKeyChecking=no build/libs/*-boot.jar "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/app.jar"
+          scp -i -v private_key -o StrictHostKeyChecking=no build/libs/*-boot.jar "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/app.jar"
           scp -i private_key -o StrictHostKeyChecking=no Dockerfile "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/Dockerfile"
 
       - name: Deploy via SSH
